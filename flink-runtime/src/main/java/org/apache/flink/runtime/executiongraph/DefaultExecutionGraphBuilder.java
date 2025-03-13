@@ -175,11 +175,11 @@ public class DefaultExecutionGraphBuilder {
         // set the basic properties
 
         try {
-            executionGraph.setJsonPlan(JsonPlanGenerator.generatePlan(jobGraph));
+            executionGraph.setPlan(JsonPlanGenerator.generatePlan(jobGraph));
         } catch (Throwable t) {
-            log.warn("Cannot create JSON plan for job", t);
+            log.warn("Cannot create plan for job", t);
             // give the graph an empty plan
-            executionGraph.setJsonPlan("{}");
+            executionGraph.setPlan(new JobPlanInfo.Plan("", "", "", new ArrayList<>()));
         }
 
         initJobVerticesOnMaster(
