@@ -192,7 +192,8 @@ class PekkoUtils {
             String bindAddress,
             int port,
             String externalHostname,
-            int externalPort) {
+            int externalPort,
+            @Nullable RpcSystem.HealthConfiguration healthConfiguration) {
         final ConfigBuilder builder = new ConfigBuilder();
 
         addBaseRemoteConfig(builder, configuration, port, externalPort);
@@ -201,6 +202,10 @@ class PekkoUtils {
         addRemoteForkJoinExecutorConfig(
                 builder,
                 ActorSystemBootstrapTools.getRemoteForkJoinExecutorConfiguration(configuration));
+
+        if (healthConfiguration != null) {
+            addHealthConfig(builder, healthConfiguration);
+        }
 
         return builder.build();
     }
@@ -411,6 +416,33 @@ class PekkoUtils {
                 .build();
     }
 
+    public static Config addHealthConfig(
+            ConfigBuilder builder, RpcSystem.HealthConfiguration configuration) {
+        return builder.add("pekko {")
+                .add("  management {")
+                .add("    http {")
+                .add("      port = " + configuration.getManagementHttpConfiguration().getPort())
+                .add(
+                        "      hostname = "
+                                + configuration.getManagementHttpConfiguration().getHostname())
+                .add(
+                        "      bind-port = "
+                                + configuration.getManagementHttpConfiguration().getBindPort())
+                .add(
+                        "      bind-hostname = "
+                                + configuration.getManagementHttpConfiguration().getBindHostname())
+                .add("    }")
+                .add("    health-checks {")
+                .add("      liveness-checks {")
+                .add(
+                        "        serving-status-check = \"org.apache.flink.runtime.rpc.pekko.healthchecks.ServingStatusCheck\"")
+                .add("      }")
+                .add("    }")
+                .add("  }")
+                .add("}")
+                .build();
+    }
+
     /**
      * Creates a local actor system without remoting.
      *
@@ -489,6 +521,29 @@ class PekkoUtils {
      * specified, then the actor system will listen on the respective address.
      *
      * @param configuration instance containing the user provided configuration values
+     * @param externalAddress optional tuple of bindAddress and port to be reachable at. If null is
+     *     given, then a Pekko config for local actor system will be returned
+     * @param healthConfiguration optional pekko-management based health configuration
+     * @return Pekko config
+     */
+    public static Config getConfig(
+            Configuration configuration,
+            @Nullable HostAndPort externalAddress,
+            @Nullable RpcSystem.HealthConfiguration healthConfiguration) {
+        return getConfig(
+                configuration,
+                externalAddress,
+                null,
+                PekkoUtils.getForkJoinExecutorConfig(
+                        ActorSystemBootstrapTools.getForkJoinExecutorConfiguration(configuration)),
+                healthConfiguration);
+    }
+
+    /**
+     * Creates a pekko config with the provided configuration values. If the listening address is
+     * specified, then the actor system will listen on the respective address.
+     *
+     * @param configuration instance containing the user provided configuration values
      * @param externalAddress optional tuple of external address and port to be reachable at. If
      *     null is given, then a Pekko config for local actor system will be returned
      * @param bindAddress optional tuple of bind address and port to be used locally. If null is
@@ -502,6 +557,29 @@ class PekkoUtils {
             @Nullable HostAndPort externalAddress,
             @Nullable HostAndPort bindAddress,
             Config executorConfig) {
+        return getConfig(configuration, externalAddress, bindAddress, executorConfig, null);
+    }
+
+    /**
+     * Creates a pekko config with the provided configuration values. If the listening address is
+     * specified, then the actor system will listen on the respective address.
+     *
+     * @param configuration instance containing the user provided configuration values
+     * @param externalAddress optional tuple of external address and port to be reachable at. If
+     *     null is given, then a Pekko config for local actor system will be returned
+     * @param bindAddress optional tuple of bind address and port to be used locally. If null is
+     *     given, wildcard IP address and the external port wil be used. Takes effect only if
+     *     externalAddress is not null.
+     * @param executorConfig config defining the used executor by the default dispatcher
+     * @param healthConfiguration pekko-management based health configuration
+     * @return Pekko config
+     */
+    public static Config getConfig(
+            Configuration configuration,
+            @Nullable HostAndPort externalAddress,
+            @Nullable HostAndPort bindAddress,
+            Config executorConfig,
+            @Nullable RpcSystem.HealthConfiguration healthConfiguration) {
 
         final Config defaultConfig =
                 PekkoUtils.getBasicConfig(configuration).withFallback(executorConfig);
@@ -514,7 +592,8 @@ class PekkoUtils {
                                 bindAddress.getHost(),
                                 bindAddress.getPort(),
                                 externalAddress.getHost(),
-                                externalAddress.getPort());
+                                externalAddress.getPort(),
+                                healthConfiguration);
 
                 return remoteConfig.withFallback(defaultConfig);
             } else {
@@ -524,7 +603,8 @@ class PekkoUtils {
                                 NetUtils.getWildcardIPAddress(),
                                 externalAddress.getPort(),
                                 externalAddress.getHost(),
-                                externalAddress.getPort());
+                                externalAddress.getPort(),
+                                healthConfiguration);
 
                 return remoteConfig.withFallback(defaultConfig);
             }

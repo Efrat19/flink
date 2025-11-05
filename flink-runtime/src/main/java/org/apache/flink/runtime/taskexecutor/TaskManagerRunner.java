@@ -94,6 +94,7 @@ import java.net.InetAddress;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -706,7 +707,8 @@ public class TaskManagerRunner implements FatalErrorHandler {
                 determineTaskManagerBindAddress(configuration, haServices, rpcSystem),
                 configuration.get(TaskManagerOptions.RPC_PORT),
                 configuration.get(TaskManagerOptions.BIND_HOST),
-                configuration.getOptional(TaskManagerOptions.RPC_BIND_PORT));
+                configuration.getOptional(TaskManagerOptions.RPC_BIND_PORT),
+                Optional.empty());
     }
 
     private static String determineTaskManagerBindAddress(

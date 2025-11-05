@@ -38,6 +38,9 @@ under the License.
 
 	<properties>
 		<pekko.version>1.1.2</pekko.version>
+		<pekko.management.version>1.1.1</pekko.management.version>
+		<scala.binary.version>2.12</scala.binary.version>
+		<scala.version>2.12.16</scala.version>
 	</properties>
 
 	<dependencies>
@@ -88,6 +91,12 @@ under the License.
 			<groupId>org.apache.pekko</groupId>
 			<artifactId>pekko-slf4j_${scala.binary.version}</artifactId>
 			<version>${pekko.version}</version>
+			<optional>${flink.markBundledAsOptional}</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-management_${scala.binary.version}</artifactId>
+			<version>${pekko.management.version}</version>
 			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 		<dependency>

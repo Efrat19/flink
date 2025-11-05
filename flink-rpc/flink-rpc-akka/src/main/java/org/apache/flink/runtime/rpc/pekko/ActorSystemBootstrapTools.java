@@ -29,6 +29,8 @@ import com.typesafe.config.Config;
 import org.apache.pekko.actor.ActorSystem;
 import org.slf4j.Logger;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.net.BindException;
 import java.util.Iterator;
@@ -63,6 +65,41 @@ public class ActorSystemBootstrapTools {
                 logger,
                 PekkoUtils.getForkJoinExecutorConfig(
                         getForkJoinExecutorConfiguration(configuration)),
+                null,
+                null);
+    }
+
+    /**
+     * Starts a remote ActorSystem at given address and specific port range.
+     *
+     * @param configuration The Flink configuration
+     * @param externalAddress The external address to access the ActorSystem.
+     * @param externalPortRange The choosing range of the external port to access the ActorSystem.
+     * @param logger The logger to output log information.
+     * @param customConfig Custom Pekko config to be combined with the config derived from Flink
+     *     configuration.
+     * @return The ActorSystem which has been started
+     * @throws Exception Thrown when actor system cannot be started in specified port range
+     */
+    @VisibleForTesting
+    public static ActorSystem startRemoteActorSystem(
+            Configuration configuration,
+            String externalAddress,
+            String externalPortRange,
+            Logger logger,
+            Config customConfig)
+            throws Exception {
+        return startRemoteActorSystem(
+                configuration,
+                PekkoUtils.getFlinkActorSystemName(),
+                externalAddress,
+                externalPortRange,
+                NetUtils.getWildcardIPAddress(),
+                Optional.empty(),
+                logger,
+                PekkoUtils.getForkJoinExecutorConfig(
+                        getForkJoinExecutorConfiguration(configuration)),
+                customConfig,
                 null);
     }
 
@@ -81,6 +118,7 @@ public class ActorSystemBootstrapTools {
      *     executor
      * @param customConfig Custom Pekko config to be combined with the config derived from Flink
      *     configuration.
+     * @param healthConfiguration Health configuration for the ActorSystem.
      * @return The ActorSystem which has been started
      * @throws Exception Thrown when actor system cannot be started in specified port range
      */
@@ -93,7 +131,8 @@ public class ActorSystemBootstrapTools {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<Integer> bindPort,
             Logger logger,
             Config actorSystemExecutorConfiguration,
-            Config customConfig)
+            Config customConfig,
+            @Nullable RpcSystem.HealthConfiguration healthConfiguration)
             throws Exception {
 
         // parse port range definition and create port iterator
@@ -118,7 +157,8 @@ public class ActorSystemBootstrapTools {
                         bindPort.orElse(externalPort),
                         logger,
                         actorSystemExecutorConfiguration,
-                        customConfig);
+                        customConfig,
+                        healthConfiguration);
             } catch (Exception e) {
                 // we can continue to try if this contains a netty channel exception
                 Throwable cause = e.getCause();
@@ -162,7 +202,8 @@ public class ActorSystemBootstrapTools {
             int bindPort,
             Logger logger,
             Config actorSystemExecutorConfiguration,
-            Config customConfig)
+            Config customConfig,
+            @Nullable RpcSystem.HealthConfiguration healthConfiguration)
             throws Exception {
 
         String externalHostPortUrl =
@@ -180,7 +221,8 @@ public class ActorSystemBootstrapTools {
                             configuration,
                             new HostAndPort(externalAddress, externalPort),
                             new HostAndPort(bindAddress, bindPort),
-                            actorSystemExecutorConfiguration);
+                            actorSystemExecutorConfiguration,
+                            healthConfiguration);
 
             if (customConfig != null) {
                 pekkoConfig = customConfig.withFallback(pekkoConfig);

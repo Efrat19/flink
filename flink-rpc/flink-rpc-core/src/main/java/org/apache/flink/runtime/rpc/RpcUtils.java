@@ -147,6 +147,31 @@ public class RpcUtils {
             @Nullable String bindAddress,
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<Integer> bindPort)
             throws Exception {
+        return createRemoteRpcService(
+                rpcSystem,
+                configuration,
+                externalAddress,
+                externalPortRange,
+                bindAddress,
+                bindPort,
+                null);
+    }
+
+    /**
+     * Convenient shortcut for constructing a remote RPC Service that takes care of checking for
+     * null and empty optionals.
+     *
+     * @see RpcSystem#remoteServiceBuilder(Configuration, String, String)
+     */
+    public static RpcService createRemoteRpcService(
+            RpcSystem rpcSystem,
+            Configuration configuration,
+            @Nullable String externalAddress,
+            String externalPortRange,
+            @Nullable String bindAddress,
+            @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<Integer> bindPort,
+            @Nullable RpcSystem.HealthConfiguration healthConfig)
+            throws Exception {
         RpcSystem.RpcServiceBuilder rpcServiceBuilder =
                 rpcSystem.remoteServiceBuilder(configuration, externalAddress, externalPortRange);
         if (bindAddress != null) {
@@ -154,6 +179,9 @@ public class RpcUtils {
         }
         if (bindPort.isPresent()) {
             rpcServiceBuilder = rpcServiceBuilder.withBindPort(bindPort.get());
+        }
+        if (healthConfig != null) {
+            rpcServiceBuilder = rpcServiceBuilder.withHealth(healthConfig);
         }
         return rpcServiceBuilder.createAndStart();
     }

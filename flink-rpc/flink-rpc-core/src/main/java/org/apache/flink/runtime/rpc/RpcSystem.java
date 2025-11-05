@@ -74,6 +74,8 @@ public interface RpcSystem extends RpcSystemUtils, AutoCloseable {
         RpcServiceBuilder withExecutorConfiguration(
                 ForkJoinExecutorConfiguration executorConfiguration);
 
+        RpcServiceBuilder withHealth(HealthConfiguration healthConfiguration);
+
         RpcService createAndStart() throws Exception;
     }
 
@@ -173,6 +175,57 @@ public interface RpcSystem extends RpcSystemUtils, AutoCloseable {
 
         public int getThreadPriority() {
             return threadPriority;
+        }
+    }
+
+    /** Configuration for the rpc-management HTTP server. */
+    class ManagementHttpConfiguration {
+        private final String hostname;
+        private final int port;
+        private final String bindHostname;
+        private final int bindPort;
+
+        public ManagementHttpConfiguration(
+                String hostname, int port, String bindHostname, @Nullable Integer bindPort) {
+            this.hostname = hostname;
+            this.port = port;
+            this.bindHostname = bindHostname;
+            if (bindPort != null) {
+                this.bindPort = bindPort;
+            } else {
+                this.bindPort = port;
+            }
+        }
+
+        public String getHostname() {
+            return hostname;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public String getBindHostname() {
+            return bindHostname;
+        }
+
+        public int getBindPort() {
+            return bindPort;
+        }
+    }
+
+    /** Configuration for management-based healthchecks API. */
+    class HealthConfiguration {
+        private final ManagementHttpConfiguration managementHttpConfiguration;
+
+        public HealthConfiguration(
+                String hostname, int port, String bindHostname, @Nullable Integer bindPort) {
+            this.managementHttpConfiguration =
+                    new ManagementHttpConfiguration(hostname, port, bindHostname, bindPort);
+        }
+
+        public ManagementHttpConfiguration getManagementHttpConfiguration() {
+            return managementHttpConfiguration;
         }
     }
 }

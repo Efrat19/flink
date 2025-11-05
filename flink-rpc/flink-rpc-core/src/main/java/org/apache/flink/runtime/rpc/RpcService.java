@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.rpc;
 
 import org.apache.flink.runtime.rpc.exceptions.RpcConnectionException;
+import org.apache.flink.runtime.rpc.health.HealthStatus;
 import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.concurrent.ScheduledExecutor;
 
@@ -121,4 +122,11 @@ public interface RpcService extends AutoCloseableAsync {
      * @return The RPC service provided scheduled executor
      */
     ScheduledExecutor getScheduledExecutor();
+
+    /**
+     * Publishes the health status of the RPC service through the event stream.
+     *
+     * @param healthStatus The health status to publish
+     */
+    default void publishHealthStatus(HealthStatus healthStatus) {}
 }

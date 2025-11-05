@@ -277,4 +277,36 @@ class PekkoUtilsTest {
         assertThat(securityConfig.getString("key-store-type")).isEqualTo("JKS");
         assertThat(securityConfig.getString("trust-store-type")).isEqualTo("JKS");
     }
+
+    @Test
+    void healthDisabledByDefault() {
+        final Configuration configuration = new Configuration();
+
+        final Config config =
+                PekkoUtils.getConfig(configuration, new HostAndPort("localhost", 31337));
+
+        assertThat(config.hasPath("pekko.management")).isFalse();
+    }
+
+    @Test
+    void healthEnabledFromConfig() {
+        final String hostname = "127.0.0.1";
+        final String bindHostname = "127.0.0.1";
+        final int port = 7777;
+        RpcSystem.HealthConfiguration healthConfig =
+                new RpcSystem.HealthConfiguration(hostname, port, bindHostname, null);
+        final Config config =
+                PekkoUtils.getConfig(
+                        new Configuration(), new HostAndPort("localhost", 31337), healthConfig);
+
+        assertThat(config.getString("pekko.management.http.hostname")).isEqualTo(hostname);
+        assertThat(config.getString("pekko.management.http.port")).isEqualTo(String.valueOf(port));
+        assertThat(config.getString("pekko.management.http.bind-hostname")).isEqualTo(bindHostname);
+        assertThat(config.getString("pekko.management.http.bind-port"))
+                .isEqualTo(String.valueOf(port));
+        assertThat(
+                        config.getString(
+                                "pekko.management.health-checks.liveness-checks.serving-status-check"))
+                .isEqualTo("org.apache.flink.runtime.rpc.pekko.healthchecks.ServingStatusCheck");
+    }
 }

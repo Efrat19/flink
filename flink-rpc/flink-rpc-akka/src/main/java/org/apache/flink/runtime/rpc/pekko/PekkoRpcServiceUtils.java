@@ -28,7 +28,7 @@ import org.apache.flink.runtime.rpc.RpcSystem;
 import org.apache.flink.util.NetUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TemporaryClassLoaderContext;
-import org.apache.flink.util.function.TriFunction;
+import org.apache.flink.util.function.QuadFunction;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -254,9 +254,12 @@ public class PekkoRpcServiceUtils {
 
         @Nullable private Config actorSystemExecutorConfiguration = null;
 
+        @Nullable private RpcSystem.HealthConfiguration healthConfiguration = null;
+
         @Nullable private Config customConfig = null;
         private String bindAddress = NetUtils.getWildcardIPAddress();
         @Nullable private Integer bindPort = null;
+        private volatile boolean enableManagement = false;
 
         /** Builder for creating a remote RPC service. */
         private PekkoRpcServiceBuilder(
@@ -322,12 +325,26 @@ public class PekkoRpcServiceUtils {
             return this;
         }
 
+        @Override
+        public RpcSystem.RpcServiceBuilder withHealth(
+                RpcSystem.HealthConfiguration healthConfiguration) {
+            this.healthConfiguration = healthConfiguration;
+            // management needs to be enabled to serve the health http routes
+            this.enableManagement = true;
+            return this;
+        }
+
         public PekkoRpcService createAndStart() throws Exception {
             return createAndStart(PekkoRpcService::new);
         }
 
         public PekkoRpcService createAndStart(
-                TriFunction<ActorSystem, PekkoRpcServiceConfiguration, ClassLoader, PekkoRpcService>
+                QuadFunction<
+                                ActorSystem,
+                                PekkoRpcServiceConfiguration,
+                                ClassLoader,
+                                Boolean,
+                                PekkoRpcService>
                         constructor)
                 throws Exception {
             if (actorSystemExecutorConfiguration == null) {
@@ -364,14 +381,16 @@ public class PekkoRpcServiceUtils {
                                     Optional.ofNullable(bindPort),
                                     logger,
                                     actorSystemExecutorConfiguration,
-                                    customConfig);
+                                    customConfig,
+                                    healthConfiguration);
                 }
             }
 
             return constructor.apply(
                     actorSystem,
                     PekkoRpcServiceConfiguration.fromConfiguration(configuration),
-                    RpcService.class.getClassLoader());
+                    RpcService.class.getClassLoader(),
+                    this.enableManagement);
         }
     }
 

@@ -31,6 +31,7 @@ import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.exceptions.RpcConnectionException;
 import org.apache.flink.runtime.rpc.exceptions.RpcRuntimeException;
+import org.apache.flink.runtime.rpc.health.HealthStatus;
 import org.apache.flink.runtime.rpc.messages.HandshakeSuccessMessage;
 import org.apache.flink.runtime.rpc.messages.RemoteHandshakeMessage;
 import org.apache.flink.util.AutoCloseableAsync;
@@ -47,11 +48,13 @@ import org.apache.pekko.actor.ActorSystem;
 import org.apache.pekko.actor.Address;
 import org.apache.pekko.actor.DeadLetter;
 import org.apache.pekko.actor.Props;
+import org.apache.pekko.management.scaladsl.PekkoManagement;
 import org.apache.pekko.pattern.Patterns;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -110,18 +113,34 @@ public class PekkoRpcService implements RpcService {
 
     private final Supervisor supervisor;
 
+    private static final boolean ENABLE_MANAGEMENT_DEFAULT = false;
+    private @Nullable PekkoManagement pekkoManagement;
+
     private volatile boolean stopped;
 
     @VisibleForTesting
     public PekkoRpcService(
             final ActorSystem actorSystem, final PekkoRpcServiceConfiguration configuration) {
-        this(actorSystem, configuration, PekkoRpcService.class.getClassLoader());
+        this(
+                actorSystem,
+                configuration,
+                PekkoRpcService.class.getClassLoader(),
+                ENABLE_MANAGEMENT_DEFAULT);
+    }
+
+    @VisibleForTesting
+    public PekkoRpcService(
+            final ActorSystem actorSystem,
+            final PekkoRpcServiceConfiguration configuration,
+            final ClassLoader flinkClassLoader) {
+        this(actorSystem, configuration, flinkClassLoader, ENABLE_MANAGEMENT_DEFAULT);
     }
 
     PekkoRpcService(
             final ActorSystem actorSystem,
             final PekkoRpcServiceConfiguration configuration,
-            final ClassLoader flinkClassLoader) {
+            final ClassLoader flinkClassLoader,
+            boolean enableManagement) {
         this.actorSystem = checkNotNull(actorSystem, "actor system");
         this.configuration = checkNotNull(configuration, "pekko rpc service configuration");
         this.flinkClassLoader = checkNotNull(flinkClassLoader, "flinkClassLoader");
@@ -157,12 +176,31 @@ public class PekkoRpcService implements RpcService {
 
         supervisor = startSupervisorActor();
         startDeadLettersActor();
+        if (enableManagement) {
+            startManagement();
+        }
     }
 
     private void startDeadLettersActor() {
         final ActorRef deadLettersActor =
                 actorSystem.actorOf(DeadLettersActor.getProps(), "deadLettersActor");
         actorSystem.eventStream().subscribe(deadLettersActor, DeadLetter.class);
+    }
+
+    private void startManagement() {
+        pekkoManagement = PekkoManagement.get(actorSystem);
+        ScalaFutureUtils.toJava(pekkoManagement.start())
+                .whenComplete(
+                        (done, throwable) -> {
+                            if (throwable != null) {
+                                throw new RpcRuntimeException(
+                                        "Pekko Management failed to start", throwable);
+                            }
+                            LOG.info(
+                                    "Pekko Management started on {}:{}",
+                                    pekkoManagement.settings().getHttpEffectiveBindHostname(),
+                                    pekkoManagement.settings().getHttpEffectiveBindPort());
+                        });
     }
 
     private Supervisor startSupervisorActor() {
@@ -423,9 +461,18 @@ public class PekkoRpcService implements RpcService {
         final CompletableFuture<Void> supervisorTerminationFuture =
                 FutureUtils.composeAfterwards(rpcActorsTerminationFuture, supervisor::closeAsync);
 
+        CompletableFuture<Void> managementTerminationFuture = supervisorTerminationFuture;
+        if (pekkoManagement != null) {
+            managementTerminationFuture =
+                    FutureUtils.runAfterwards(
+                                    supervisorTerminationFuture,
+                                    () -> ScalaFutureUtils.toJava(pekkoManagement.stop()))
+                            .thenRun(() -> LOG.info("Pekko management stopped."));
+        }
+
         final CompletableFuture<Void> actorSystemTerminationFuture =
                 FutureUtils.composeAfterwards(
-                        supervisorTerminationFuture,
+                        managementTerminationFuture,
                         () -> ScalaFutureUtils.toJava(actorSystem.terminate()));
 
         actorSystemTerminationFuture.whenComplete(
@@ -467,6 +514,16 @@ public class PekkoRpcService implements RpcService {
     @Override
     public ScheduledExecutor getScheduledExecutor() {
         return internalScheduledExecutor;
+    }
+
+    @Override
+    public void publishHealthStatus(HealthStatus healthStatus) {
+        actorSystem.eventStream().publish(healthStatus);
+    }
+
+    @VisibleForTesting
+    public @Nullable PekkoManagement getPekkoManagement() {
+        return pekkoManagement;
     }
 
     // ---------------------------------------------------------------------------------------

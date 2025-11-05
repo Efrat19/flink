@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.rpc.pekko;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.FlinkAssertions;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.concurrent.pekko.ScalaFutureUtils;
@@ -30,9 +31,11 @@ import org.apache.flink.util.concurrent.ScheduledExecutor;
 
 import org.apache.pekko.actor.ActorSystem;
 import org.apache.pekko.actor.Terminated;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.annotation.Nonnull;
 
@@ -63,16 +66,16 @@ class PekkoRpcServiceTest {
 
     private static PekkoRpcService pekkoRpcService;
 
-    @BeforeAll
-    static void setup() {
+    @BeforeEach
+    void setup() {
         actorSystem = PekkoUtils.createDefaultActorSystem();
         pekkoRpcService =
                 new PekkoRpcService(
                         actorSystem, PekkoRpcServiceConfiguration.defaultConfiguration());
     }
 
-    @AfterAll
-    static void shutdown() throws InterruptedException, ExecutionException, TimeoutException {
+    @AfterEach
+    void shutdown() throws InterruptedException, ExecutionException, TimeoutException {
         final CompletableFuture<Void> rpcTerminationFuture = pekkoRpcService.closeAsync();
         final CompletableFuture<Terminated> actorSystemTerminationFuture =
                 ScalaFutureUtils.toJava(actorSystem.terminate());
@@ -128,6 +131,23 @@ class PekkoRpcServiceTest {
     void testGetPort() {
         assertThat(pekkoRpcService.getPort())
                 .isEqualTo(PekkoUtils.getAddress(actorSystem).port().get());
+    }
+
+    @Test
+    void testManagementInitializedWhenEnabled() {
+        final boolean enableManagement = true;
+        pekkoRpcService =
+                new PekkoRpcService(
+                        PekkoUtils.createDefaultActorSystem(),
+                        PekkoRpcServiceConfiguration.fromConfiguration(new Configuration()),
+                        PekkoRpcService.class.getClassLoader(),
+                        enableManagement);
+        assertThat(pekkoRpcService.getPekkoManagement()).isNotNull();
+    }
+
+    @Test
+    void testManagementDoesntInitializeByDefault() {
+        assertThat(pekkoRpcService.getPekkoManagement()).isNull();
     }
 
     /**
@@ -262,9 +282,10 @@ class PekkoRpcServiceTest {
     /**
      * Tests that the {@link PekkoRpcService} terminates all its RpcEndpoints when shutting down.
      */
-    @Test
-    void testRpcServiceShutDownWithRpcEndpoints() throws Exception {
-        final PekkoRpcService pekkoRpcService = startRpcService();
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRpcServiceShutDownWithRpcEndpoints(boolean enableManagement) throws Exception {
+        final PekkoRpcService pekkoRpcService = startRpcService(enableManagement);
 
         try {
             final int numberActors = 5;
@@ -288,9 +309,10 @@ class PekkoRpcServiceTest {
      * Tests that {@link PekkoRpcService} terminates all its RpcEndpoints and also stops the
      * underlying {@link ActorSystem} if one of the RpcEndpoints fails while stopping.
      */
-    @Test
-    void testRpcServiceShutDownWithFailingRpcEndpoints() throws Exception {
-        final PekkoRpcService pekkoRpcService = startRpcService();
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRpcServiceShutDownWithFailingRpcEndpoints(boolean enableManagement) throws Exception {
+        final PekkoRpcService pekkoRpcService = startRpcService(enableManagement);
 
         final int numberActors = 5;
 
@@ -382,6 +404,11 @@ class PekkoRpcServiceTest {
 
     @Nonnull
     private PekkoRpcService startRpcService() {
+        return startRpcService(false);
+    }
+
+    @Nonnull
+    private PekkoRpcService startRpcService(boolean enableManagement) {
         final ActorSystem actorSystem = PekkoUtils.createDefaultActorSystem();
         return new PekkoRpcService(
                 actorSystem, PekkoRpcServiceConfiguration.defaultConfiguration());
