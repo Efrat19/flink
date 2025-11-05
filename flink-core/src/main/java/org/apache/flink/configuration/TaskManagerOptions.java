@@ -117,6 +117,66 @@ public class TaskManagerOptions {
                                     + RPC_PORT.key()
                                     + "') will be used.");
 
+    /**
+     * Whether to expose a http health checks endpoint on the TaskManager, for external monitoring,
+     * on top of pekko management.
+     */
+    @Documentation.Section({Documentation.Sections.ALL_TASK_MANAGER})
+    public static final ConfigOption<Boolean> HEALTH_ENABLED =
+            key("taskmanager.health.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to expose a http health checks endpoint on the TaskManager, for external monitoring, on top of pekko management.");
+
+    /** The local HTTP Hostname to expose for health checks. */
+    @Documentation.Section({
+        Documentation.Sections.COMMON_HOST_PORT,
+        Documentation.Sections.ALL_TASK_MANAGER
+    })
+    public static final ConfigOption<String> HEALTH_HOSTNAME =
+            key("taskmanager.health.hostname")
+                    .stringType()
+                    .defaultValue("127.0.0.1")
+                    .withDescription("Local HTTP Hostname to expose for health checks.");
+
+    @Documentation.Section({
+        Documentation.Sections.COMMON_HOST_PORT,
+        Documentation.Sections.ALL_TASK_MANAGER
+    })
+    /** The local HTTP Port to expose for health checks. */
+    public static final ConfigOption<Integer> HEALTH_PORT =
+            key("taskmanager.health.port")
+                    .intType()
+                    .defaultValue(7626)
+                    .withDescription("Local HTTP Port to expose for health checks.");
+
+    /** The hostname to bind to for health checks. */
+    @Documentation.Section({
+        Documentation.Sections.COMMON_HOST_PORT,
+        Documentation.Sections.ALL_TASK_MANAGER
+    })
+    public static final ConfigOption<String> HEALTH_BIND_HOSTNAME =
+            key("taskmanager.health.bind-hostname")
+                    .stringType()
+                    .defaultValue("0.0.0.0")
+                    .withDescription("Hostname to bind to for health checks.");
+
+    @Documentation.Section({
+        Documentation.Sections.COMMON_HOST_PORT,
+        Documentation.Sections.ALL_TASK_MANAGER
+    })
+    /** The port to bind to for health checks. */
+    public static final ConfigOption<Integer> HEALTH_BIND_PORT =
+            key("taskmanager.health.bind-port")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "HTTP Port to bind to for health checks. If not configured, the"
+                                    + " port (configured by '"
+                                    + HEALTH_PORT.key()
+                                    + "') will be used.");
+
     /** The default port that <code>CollectSinkFunction$ServerThread</code> is using. */
     @Documentation.Section({
         Documentation.Sections.COMMON_HOST_PORT,

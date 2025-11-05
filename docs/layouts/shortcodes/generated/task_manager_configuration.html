@@ -57,6 +57,36 @@
             <td>The interval for the log thread to log the current memory usage.</td>
         </tr>
         <tr>
+            <td><h5>taskmanager.health.bind-hostname</h5></td>
+            <td style="word-wrap: break-word;">"0.0.0.0"</td>
+            <td>String</td>
+            <td>Hostname to bind to for health checks.</td>
+        </tr>
+        <tr>
+            <td><h5>taskmanager.health.bind-port</h5></td>
+            <td style="word-wrap: break-word;">(none)</td>
+            <td>Integer</td>
+            <td>HTTP Port to bind to for health checks. If not configured, the port (configured by 'taskmanager.health.port') will be used.</td>
+        </tr>
+        <tr>
+            <td><h5>taskmanager.health.enabled</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>Whether to expose a http health checks endpoint on the TaskManager, for external monitoring, on top of pekko management.</td>
+        </tr>
+        <tr>
+            <td><h5>taskmanager.health.hostname</h5></td>
+            <td style="word-wrap: break-word;">"127.0.0.1"</td>
+            <td>String</td>
+            <td>Local HTTP Hostname to expose for health checks.</td>
+        </tr>
+        <tr>
+            <td><h5>taskmanager.health.port</h5></td>
+            <td style="word-wrap: break-word;">7626</td>
+            <td>Integer</td>
+            <td>Local HTTP Port to expose for health checks.</td>
+        </tr>
+        <tr>
             <td><h5>taskmanager.host</h5></td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>String</td>

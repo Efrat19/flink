@@ -59,6 +59,7 @@ import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcSystem;
 import org.apache.flink.runtime.rpc.RpcSystemUtils;
 import org.apache.flink.runtime.rpc.RpcUtils;
+import org.apache.flink.runtime.rpc.health.ServingStatus;
 import org.apache.flink.runtime.security.SecurityConfiguration;
 import org.apache.flink.runtime.security.SecurityUtils;
 import org.apache.flink.runtime.security.token.DelegationTokenReceiverRepository;
@@ -305,6 +306,10 @@ public class TaskManagerRunner implements FatalErrorHandler {
             startTaskManagerRunnerServices();
             taskExecutorService.start();
         }
+        if (healthEnabled()) {
+            rpcService.publishHealthStatus(ServingStatus.SERVING);
+            LOG.info("Health enabled, TaskManager starting in SERVING status");
+        }
     }
 
     public void close() throws Exception {
@@ -444,7 +449,10 @@ public class TaskManagerRunner implements FatalErrorHandler {
         LOG.error(
                 "Fatal error occurred while executing the TaskManager. Shutting it down...",
                 exception);
-
+        if (healthEnabled() && rpcService != null) {
+            rpcService.publishHealthStatus(ServingStatus.NOT_SERVING);
+            LOG.info("Serving status transitioned to NOT_SERVING status due to fatal error");
+        }
         if (ExceptionUtils.isJvmFatalOrOutOfMemoryError(exception)) {
             terminateJVM();
         } else {
@@ -557,6 +565,13 @@ public class TaskManagerRunner implements FatalErrorHandler {
         }
 
         System.exit(exitCode);
+    }
+
+
+    public boolean healthEnabled() {
+        return configuration
+                .getOptional(TaskManagerOptions.HEALTH_ENABLED)
+                .orElse(false);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -708,7 +723,19 @@ public class TaskManagerRunner implements FatalErrorHandler {
                 configuration.get(TaskManagerOptions.RPC_PORT),
                 configuration.get(TaskManagerOptions.BIND_HOST),
                 configuration.getOptional(TaskManagerOptions.RPC_BIND_PORT),
-                Optional.empty());
+                getHealthConfig(configuration));
+    }
+
+    @VisibleForTesting
+    public static RpcSystem.HealthConfiguration getHealthConfig(Configuration configuration) {
+        if (!configuration.get(TaskManagerOptions.HEALTH_ENABLED)) {
+            return null;
+        }
+        return new RpcSystem.HealthConfiguration(
+                configuration.get(TaskManagerOptions.HEALTH_HOSTNAME),
+                configuration.get(TaskManagerOptions.HEALTH_PORT),
+                configuration.get(TaskManagerOptions.HEALTH_BIND_HOSTNAME),
+                configuration.getOptional(TaskManagerOptions.HEALTH_BIND_PORT).orElse(null));
     }
 
     private static String determineTaskManagerBindAddress(

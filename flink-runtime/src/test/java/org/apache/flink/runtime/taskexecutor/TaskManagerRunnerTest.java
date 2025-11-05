@@ -35,6 +35,7 @@ import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.metrics.MetricRegistry;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.rpc.RpcSystem;
 import org.apache.flink.runtime.security.token.DelegationTokenReceiverRepository;
 import org.apache.flink.testutils.junit.utils.TempDirUtils;
 import org.apache.flink.util.FlinkException;
@@ -251,6 +252,51 @@ class TaskManagerRunnerTest {
                         ClusterEntrypointUtils.generateTaskManagerWorkingDirectoryFile(
                                 configuration, resourceId))
                 .exists();
+    }
+
+    @Test
+    void testGetHealthConfigReturnsNullByDefault() {
+        assertThat(TaskManagerRunner.getHealthConfig(createConfiguration())).isNull();
+    }
+
+    @Test
+    void testGetHealthConfigReturnsDefaultHealthConfigIfHealthEnabled() {
+        final Configuration configuration = createConfiguration();
+        configuration.set(TaskManagerOptions.HEALTH_ENABLED, true);
+        RpcSystem.HealthConfiguration healthConfig =
+                TaskManagerRunner.getHealthConfig(configuration);
+        assertThat(healthConfig).isNotNull();
+        assertThat(healthConfig.getManagementHttpConfiguration().getHostname())
+                .isEqualTo(TaskManagerOptions.HEALTH_HOSTNAME.defaultValue());
+        assertThat(healthConfig.getManagementHttpConfiguration().getPort())
+                .isEqualTo(TaskManagerOptions.HEALTH_PORT.defaultValue());
+        assertThat(healthConfig.getManagementHttpConfiguration().getBindHostname())
+                .isEqualTo(TaskManagerOptions.HEALTH_BIND_HOSTNAME.defaultValue());
+        // bind port should equal port by default
+        assertThat(healthConfig.getManagementHttpConfiguration().getBindPort())
+                .isEqualTo(TaskManagerOptions.HEALTH_PORT.defaultValue());
+    }
+
+    @Test
+    void testGetHealthConfigReturnsConfiguredHealthConfigIfHealthEnabled() {
+        final Configuration configuration = createConfiguration();
+        configuration.set(TaskManagerOptions.HEALTH_ENABLED, true);
+        final String hostname = "health-host";
+        final int port = 1234;
+        final String bindHostname = "bind-health-host";
+        final int bindPort = 4321;
+        configuration.set(TaskManagerOptions.HEALTH_HOSTNAME, hostname);
+        configuration.set(TaskManagerOptions.HEALTH_PORT, port);
+        configuration.set(TaskManagerOptions.HEALTH_BIND_HOSTNAME, bindHostname);
+        configuration.set(TaskManagerOptions.HEALTH_BIND_PORT, bindPort);
+        RpcSystem.HealthConfiguration healthConfig =
+                TaskManagerRunner.getHealthConfig(configuration);
+        assertThat(healthConfig).isNotNull();
+        assertThat(healthConfig.getManagementHttpConfiguration().getHostname()).isEqualTo(hostname);
+        assertThat(healthConfig.getManagementHttpConfiguration().getPort()).isEqualTo(port);
+        assertThat(healthConfig.getManagementHttpConfiguration().getBindHostname())
+                .isEqualTo(bindHostname);
+        assertThat(healthConfig.getManagementHttpConfiguration().getBindPort()).isEqualTo(bindPort);
     }
 
     @Nonnull
